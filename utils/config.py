@@ -1,1 +1,23 @@
-# 하이퍼파라미터 및 설정 정보
+# 데이터 경로
+DATA_DIR = "./data"
+
+RANDOM_SEED = 42
+
+NUM_WORKERS = 4
+NUM_CLASSES = 6
+
+BATCH_SIZE = 4
+EPOCHES = 30
+
+LEARNING_RATE = 0.0001
+
+# 이미지 전처리 설정
+IMAGE_SIZE = 512
+
+TEMPERATURE = 3.0
+ALPHA = 0.7
+
+K_FOLDS = 5
+
+LABELS = ["검정고시합격증명서", "국민체력100", "기초생활수급자증명서", "주민등록본", "체력평가", "생활기록부대체양식"]
+THRESHOLD = 0.5

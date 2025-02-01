@@ -1,0 +1,16 @@
+torch
+torchvision
+torchaudio
+torchsummary
+numpy
+matplotlib
+tqdm
+pillow
+opencv-python
+albumentations
+torchmetrics
+onnx
+onnxruntime
+opencv-python-headless
+scikit-learn
+pandas

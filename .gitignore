@@ -1,3 +1,6 @@
 __pycache__/
 .venv_aic/
 data/
+validation_visualization/
+fonts/
+model_pth/
