@@ -23,6 +23,28 @@ def collate_fn(batch):
     return padded_images, labels
 
 
+def collate_fn_test(batch):
+    """
+    DataLoader에서 배치 데이터를 (이미지, 파일명)으로 변환하는 collate_fn
+    """
+    images, file_names = zip(*batch)
+
+    # ✅ 가장 큰 높이, 너비를 찾아서 패딩 적용
+    max_height = max([img.shape[1] for img in images])
+    max_width = max([img.shape[2] for img in images])
+
+    padded_images = []
+    for img in images:
+        pad_h = max_height - img.shape[1]
+        pad_w = max_width - img.shape[2]
+        padded_img = torch.nn.functional.pad(img, (0, pad_w, 0, pad_h), value=0)  # 오른쪽, 아래쪽에 패딩 추가
+        padded_images.append(padded_img)
+
+    images = torch.stack(padded_images, dim=0)  # ✅ 동일한 크기로 정렬 후 스택
+
+    return images, list(file_names)
+
+
 def resize_with_padding(image, target_size):
     """
     비율을 유지하면서 세로 크기에 맞추고 가로 크기를 패딩하여 리사이즈

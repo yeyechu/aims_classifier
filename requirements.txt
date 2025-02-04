@@ -14,3 +14,5 @@ onnxruntime
 opencv-python-headless
 scikit-learn
 pandas
+wandb
+pdf2image

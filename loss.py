@@ -21,3 +21,26 @@ class DistillationLoss(nn.Module):
 
         # 최종 손실
         return self.alpha * distillation_loss + (1 - self.alpha) * cross_entropy_loss
+    
+
+
+class FeatureDistillationLoss(nn.Module):
+    def __init__(self, alpha=0.7, temperature=4.0, feature_weight=0.2):
+        super().__init__()
+        self.alpha = alpha
+        self.temperature = temperature
+        self.feature_weight = feature_weight
+        self.kl_loss = nn.KLDivLoss(reduction="batchmean")
+        self.ce_loss = nn.CrossEntropyLoss()
+        self.feature_loss = nn.MSELoss()
+
+    def forward(self, student_logits, teacher_logits, student_features, teacher_features, labels):
+        kd_loss = self.kl_loss(
+            nn.functional.log_softmax(student_logits / self.temperature, dim=1),
+            nn.functional.softmax(teacher_logits / self.temperature, dim=1)
+        ) * (self.temperature ** 2)
+
+        ce_loss = self.ce_loss(student_logits, labels)
+        feature_loss = self.feature_loss(student_features, teacher_features)
+
+        return self.alpha * kd_loss + (1 - self.alpha) * ce_loss + self.feature_weight * feature_loss

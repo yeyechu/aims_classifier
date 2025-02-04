@@ -12,47 +12,21 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from utils.eda.set_font_matplot import set_nanumgothic_font
 set_nanumgothic_font()
 
-from loss import DistillationLoss
+from loss import DistillationLoss, FeatureDistillationLoss
 from utils.early_stopping import EarlyStopping
 from utils.config import LABELS
 
 
-def train_teacher_student(teacher, student, train_loader, val_loader, epochs, lr, temperature, alpha):
-    criterion = DistillationLoss(temperature, alpha)
-    optimizer = optim.Adam(student.parameters(), lr=lr)
-
-    for epoch in range(epochs):
-        student.train()
-        total_loss = 0
-        for images, labels in train_loader:
-            images, labels = images.cuda(), labels.cuda()
-
-            with torch.no_grad():
-                teacher_logits = teacher(images)  # Teacher의 예측
-
-            student_logits = student(images)  # Student의 예측
-            loss = criterion(student_logits, teacher_logits, labels)
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item()
-
-        print(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss / len(train_loader):.4f}")
-
-        # Validation
-        validate(student, val_loader)
-
-
-def train_teacher(teacher, train_loader, val_loader, epochs, lr, num_classes, fold_idx):
-    teacher.classifier[1] = nn.Linear(1280, num_classes)  # EfficientNet
+def train_teacher(teacher, train_loader, val_loader, epochs, lr, num_classes, fold_idx, patience):
+    #teacher.base_model.classifier[1] = nn.Linear(1280, num_classes)
+    teacher.classifier[1] = nn.Linear(1280, num_classes)
     teacher = teacher.train().cuda()
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(teacher.parameters(), lr=lr)
     scaler = amp.GradScaler()
     scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=2)
-    early_stopping = EarlyStopping(patience=5)
+    early_stopping = EarlyStopping(patience=patience)
 
     best_val_loss = float("inf")  # Best Validation Loss 초기화
 
@@ -84,21 +58,18 @@ def train_teacher(teacher, train_loader, val_loader, epochs, lr, num_classes, fo
         scheduler.step(val_loss)
         early_stopping(val_loss)
 
-        if early_stopping.early_stop:
-            print("Early Stopping 적용! 학습 중단")
-            break
-
-
-        # ✅ 모델 저장 디렉토리 생성
         model_dir = "model_pth"
         os.makedirs(model_dir, exist_ok=True)
 
-        # ✅ Fold별 Teacher 모델 저장
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             model_save_path = os.path.join(model_dir, f"teacher_model_fold{fold_idx}.pth")
             torch.save(teacher.state_dict(), model_save_path)
             print(f"✅ Best Model Updated: {model_save_path} (Validation Loss: {best_val_loss:.4f})")
+
+        if early_stopping.early_stop:
+            print("Early Stopping 적용! 학습 중단")
+            break
     
 
 
@@ -143,22 +114,17 @@ def validate(model, val_loader, class_labels, save_dir="validation_visualization
                 true_class = class_labels[true_label]
                 pred_class = class_labels[pred_label]
 
-                # ✅ 이미지 변환 (정규화 해제)
                 image_np = images[idx].cpu().numpy().transpose(1, 2, 0)  # (C, H, W) → (H, W, C)
                 image_np = np.clip(image_np * 255, 0, 255).astype(np.uint8)  # 정규화 해제
 
-                # ✅ OpenCV에서 PIL로 변환
                 image_pil = Image.fromarray(cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB))
                 draw = ImageDraw.Draw(image_pil)
 
-                # ✅ 한글 텍스트 삽입
                 color = (0, 255, 0) if true_class == pred_class else (255, 0, 0)  # 맞으면 초록, 틀리면 빨강
                 draw.text((10, 30), f"정답: {true_class} | 예측: {pred_class}", font=font, fill=color)
 
-                # ✅ PIL 이미지를 다시 OpenCV 형식으로 변환
                 annotated_image = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
 
-                # ✅ 이미지 저장
                 save_path = os.path.join(save_dir, f"val_{batch_idx}_{idx}.png")
                 cv2.imwrite(save_path, annotated_image)
 
@@ -171,7 +137,7 @@ def validate(model, val_loader, class_labels, save_dir="validation_visualization
 
 
 # MobileNet Student 모델 학습 함수 (지식 증류 적용)
-def train_student(teacher, student, train_loader, val_loader, epochs, lr, temperature, alpha, num_classes, fold_idx):
+def train_student(teacher, student, train_loader, val_loader, epochs, lr, temperature, alpha, num_classes, fold_idx, patience):
     """
     K-Fold 교차 검증을 적용한 Student 모델 학습 함수.
 
@@ -193,8 +159,8 @@ def train_student(teacher, student, train_loader, val_loader, epochs, lr, temper
     model_dir = "model_pth"
     os.makedirs(model_dir, exist_ok=True)
 
-    teacher_model_path = os.path.join(model_dir, f"teacher_model_fold{fold_idx}.pth")
-    teacher.load_state_dict(torch.load(teacher_model_path))
+    # teacher_model_path = os.path.join(model_dir, f"teacher_model_fold{fold_idx}.pth")
+    # teacher.load_state_dict(torch.load(teacher_model_path))
     teacher = teacher.eval().cuda()
 
     student.classifier[3] = nn.Linear(1024, num_classes)  # MobileNet
@@ -204,7 +170,7 @@ def train_student(teacher, student, train_loader, val_loader, epochs, lr, temper
     optimizer = optim.Adam(student.parameters(), lr=lr)
     scaler = amp.GradScaler()
     scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=2)
-    early_stopping = EarlyStopping(patience=5)
+    early_stopping = EarlyStopping(patience=patience)
 
     best_val_loss = float("inf")  # Best Validation Loss 초기화
 
@@ -239,11 +205,6 @@ def train_student(teacher, student, train_loader, val_loader, epochs, lr, temper
         scheduler.step(val_loss)
         early_stopping(val_loss)
 
-        if early_stopping.early_stop:
-            print("Early Stopping 적용! 학습 중단")
-            break
-    
-
         # ✅ Fold별 Student 모델 저장
         if val_loss < best_val_loss:
             best_val_loss = val_loss
@@ -251,3 +212,341 @@ def train_student(teacher, student, train_loader, val_loader, epochs, lr, temper
             torch.save(student.state_dict(), model_save_path)
             print(f"✅ Best Model Updated: {model_save_path} (Validation Loss: {best_val_loss:.4f})")
 
+        if early_stopping.early_stop:
+            print("Early Stopping 적용! 학습 중단")
+            break
+
+
+# Feature Distillation용 MSE Loss
+criterion_feature_distill = nn.MSELoss()
+
+
+def get_intermediate_features(model, layer_name):
+    """
+    특정 레이어의 Feature Map을 가져오기 위한 Hook 등록 함수
+    """
+    features = {}
+
+    def hook(module, input, output):
+        features[layer_name] = output
+
+    layer = dict([*model.named_modules()])[layer_name]  # 원하는 레이어 선택
+    layer.register_forward_hook(hook)
+    
+    return features
+
+
+def train_student_with_fd(teacher, student, train_loader, val_loader, epochs, lr, temperature, alpha, num_classes, fold_idx, patience):
+    model_dir = "model_pth"
+    os.makedirs(model_dir, exist_ok=True)
+
+    teacher_model_path = os.path.join(model_dir, f"teacher_model_fold{fold_idx}.pth")
+    teacher.load_state_dict(torch.load(teacher_model_path))
+    teacher = teacher.eval().cuda()
+
+    student.classifier[3] = nn.Linear(1024, num_classes)  # MobileNet
+    student = student.train().cuda()
+
+    # ✅ Feature Distillation Loss 추가
+    criterion_feature = FeatureDistillationLoss(alpha=0.7, temperature=4.0, feature_weight=0.2)
+
+    optimizer = optim.Adam(student.parameters(), lr=lr)
+    scaler = amp.GradScaler()
+    scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=2)
+    early_stopping = EarlyStopping(patience=patience)
+
+    best_val_loss = float("inf")
+
+    for epoch in range(epochs):
+        torch.cuda.empty_cache()
+        gc.collect()
+        student.train()
+        total_loss = 0
+
+        for images, labels in train_loader:
+            images, labels = images.cuda(), labels.cuda()
+
+            with torch.no_grad():
+                teacher_logits, teacher_features_out = teacher(images)
+
+            with amp.autocast("cuda"):
+                student_logits, student_features_out = student(images)
+
+                # ✅ Feature Distillation Loss 계산
+                loss_fd = criterion_feature(student_logits, teacher_logits, student_features_out, teacher_features_out, labels)
+
+            optimizer.zero_grad()
+            scaler.scale(loss_fd).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+            total_loss += loss_fd.item()
+
+        avg_train_loss = total_loss / len(train_loader)
+        val_loss = validate(student, val_loader, LABELS)
+
+        print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_train_loss:.4f}, Validation Loss: {val_loss:.4f}")
+
+        scheduler.step(val_loss)
+        early_stopping(val_loss)
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            model_save_path = os.path.join(model_dir, f"student_model_fold{fold_idx}.pth")
+            torch.save(student.state_dict(), model_save_path)
+            print(f"✅ Best Model Updated: {model_save_path} (Validation Loss: {best_val_loss:.4f})")
+
+        if early_stopping.early_stop:
+            print("Early Stopping 적용! 학습 중단")
+            break
+
+
+def validate_va(model, val_loader, class_labels):
+    """
+    모델 검증 함수
+    """
+    model.eval()
+    correct = 0
+    total = 0
+    total_loss = 0
+    criterion = nn.CrossEntropyLoss()
+
+    with torch.no_grad():
+        for images, labels in val_loader:
+            images, labels = images.cuda(), labels.cuda()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+
+            _, preds = torch.max(outputs, 1)
+            correct += (preds == labels).sum().item()
+            total += labels.size(0)
+            total_loss += loss.item()
+
+    accuracy = 100 * correct / total
+    avg_loss = total_loss / len(val_loader) 
+
+    print(f"Validation Accuracy: {accuracy:.2f}%, Validation Loss: {avg_loss:.4f}")
+
+    return avg_loss, accuracy 
+
+
+def train_student_with_va(teacher, student, train_loader, val_loader, epochs, lr, temperature, alpha, num_classes, fold_idx, patience):
+    """
+    K-Fold 교차 검증을 적용한 Student 모델 학습 함수.
+
+    Args:
+        teacher (nn.Module): Teacher 모델
+        student (nn.Module): MobileNet Student 모델
+        train_loader (DataLoader): 학습 데이터 로더
+        val_loader (DataLoader): 검증 데이터 로더
+        epochs (int): 학습할 Epoch 수
+        lr (float): Learning Rate
+        temperature (float): 지식 증류 온도 값
+        alpha (float): 지식 증류 가중치
+        num_classes (int): 클래스 개수
+        fold_idx (int): 현재 K-Fold의 인덱스 (Fold 번호)
+        patience (int): Early Stopping patience 값
+    """
+
+    model_dir = "model_pth"
+    os.makedirs(model_dir, exist_ok=True)
+
+    val_acc_file = os.path.join(model_dir, f"validation_accuracies.txt")
+
+    teacher = teacher.eval().cuda()
+
+    student.classifier[3] = torch.nn.Linear(1024, num_classes)
+    student = student.train().cuda()
+
+    criterion = DistillationLoss(temperature, alpha)
+    optimizer = optim.Adam(student.parameters(), lr=lr)
+    scaler = amp.GradScaler()
+    scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=2)
+    early_stopping = EarlyStopping(patience=patience)
+
+    best_val_loss = float("inf")
+    best_val_acc = 0.0
+
+    for epoch in range(epochs):
+        torch.cuda.empty_cache()
+        gc.collect()
+        student.train()
+        total_loss = 0
+
+        for images, labels in train_loader:
+            images, labels = images.cuda(), labels.cuda()
+
+            with torch.no_grad():
+                teacher_logits = teacher(images)
+
+            with amp.autocast("cuda"):
+                student_logits = student(images)
+                loss = criterion(student_logits, teacher_logits, labels)
+
+            optimizer.zero_grad()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+            total_loss += loss.item()
+
+        avg_train_loss = total_loss / len(train_loader)
+        val_loss, val_acc = validate_va(student, val_loader, LABELS)
+
+        print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_train_loss:.4f}, Validation Loss: {val_loss:.4f}, Validation Acc: {val_acc:.2f}%")
+
+        scheduler.step(val_loss)
+        early_stopping(val_loss)
+
+        with open(val_acc_file, "a") as f:
+            f.write(f"Fold {fold_idx}, Epoch {epoch+1}, Validation Accuracy: {val_acc:.2f}%\n")
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            best_val_acc = val_acc
+            model_save_path = os.path.join(model_dir, f"student_model_fold{fold_idx}.pth")
+            torch.save(student.state_dict(), model_save_path)
+            print(f"✅ Best Model Updated: {model_save_path} (Validation Loss: {best_val_loss:.4f}, Accuracy: {best_val_acc:.2f}%)")
+
+        if early_stopping.early_stop:
+            print("✅ Early Stopping 적용! 학습 중단")
+            break
+
+
+def train_teacher_all(teacher, train_loader, epochs, lr, num_classes):
+    """
+    Teacher 모델을 학습하는 함수 (Validation 없이 Train만 수행)
+
+    Args:
+        teacher (nn.Module): Teacher 모델
+        epochs (int): 학습할 Epoch 수
+        lr (float): Learning Rate
+        num_classes (int): 클래스 개수
+    """
+
+    teacher.classifier[1] = nn.Linear(1280, num_classes)  # EfficientNet
+    teacher = teacher.train().cuda()
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(teacher.parameters(), lr=lr)
+    scaler = amp.GradScaler()
+    scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3)
+
+    model_dir = "model_pth"
+    os.makedirs(model_dir, exist_ok=True)
+
+    best_train_loss = float("inf")  # Best Train Loss 초기화
+
+    # ✅ 학습 루프
+    for epoch in range(epochs):
+        torch.cuda.empty_cache()
+        gc.collect()
+        teacher.train()
+        total_loss = 0
+
+        for images, labels in train_loader:
+            images, labels = images.cuda(), labels.cuda()
+
+            with amp.autocast("cuda"):
+                outputs = teacher(images)
+                loss = criterion(outputs, labels)
+
+            optimizer.zero_grad()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+            total_loss += loss.item()
+
+        avg_train_loss = total_loss / len(train_loader)
+
+        print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}")
+
+        scheduler.step(avg_train_loss)
+
+        # ✅ Train Loss가 최저일 때 모델 저장
+        if avg_train_loss < best_train_loss:
+            best_train_loss = avg_train_loss
+            model_save_path = os.path.join(model_dir, f"teacher_model.pth")
+            torch.save(teacher.state_dict(), model_save_path)
+            print(f"✅ Best Model Updated: {model_save_path} (Train Loss: {best_train_loss:.4f})")
+
+
+def train_student_all(teacher, student, train_loader, epochs, lr, temperature, alpha, num_classes, patience):
+    """
+    Teacher 모델을 활용하여 Student 모델을 학습하는 함수 (Validation 없이 Train만 수행)
+
+    Args:
+        teacher (nn.Module): Teacher 모델
+        student (nn.Module): MobileNet Student 모델
+        train_loader (DataLoader): Train 데이터 로더
+        epochs (int): 학습할 Epoch 수
+        lr (float): Learning Rate
+        temperature (float): 지식 증류 온도 값
+        alpha (float): 지식 증류 가중치
+        num_classes (int): 클래스 개수
+    """
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model_dir = "model_pth"
+    os.makedirs(model_dir, exist_ok=True)
+
+    teacher = teacher.to(device).eval()
+
+    student.classifier[3] = nn.Linear(1024, num_classes)  # MobileNet
+    student = student.to(device).train()
+
+    criterion = DistillationLoss(temperature, alpha)
+    optimizer = optim.Adam(student.parameters(), lr=lr)
+    scaler = amp.GradScaler()
+    scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=2)
+
+    # Early Stopping 변수
+    best_train_loss = float("inf")
+    patience_counter = 0
+    early_stopping_patience = patience
+
+    for epoch in range(epochs):
+        torch.cuda.empty_cache()
+        gc.collect()
+        student.train()
+        total_loss = 0
+
+        for images, labels in train_loader:
+            images, labels = images.to(device), labels.to(device)
+
+            with torch.no_grad():
+                teacher_logits = teacher(images)
+
+            with amp.autocast(device_type="cuda"):
+                student_logits = student(images)
+                loss = criterion(student_logits, teacher_logits, labels)
+
+            
+            optimizer.zero_grad()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+            total_loss += loss.item()
+
+        avg_train_loss = total_loss / len(train_loader)
+        scheduler.step(avg_train_loss)
+
+        print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}")
+
+        # Train Loss가 최소일 때 모델 저장
+        if avg_train_loss < best_train_loss:
+            best_train_loss = avg_train_loss
+            model_save_path = os.path.join(model_dir, "student_model.pth")
+            torch.save(student.state_dict(), model_save_path)
+            print(f"✅ Best Model Updated: {model_save_path} (Train Loss: {best_train_loss:.4f})")
+            patience_counter = 0
+        else:
+            patience_counter += 1
+
+        # Early Stopping 적용
+        if patience_counter >= early_stopping_patience:
+            print("Early Stopping")
+            break

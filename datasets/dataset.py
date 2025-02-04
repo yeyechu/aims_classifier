@@ -48,13 +48,33 @@ class DocumentDataset(Dataset):
         image = cv2.imread(img_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # OpenCV는 기본적으로 BGR 형식이므로 RGB로 변환
         image = Image.fromarray(image) 
-
+        
         if self.transform:
             image = self.transform(image)
         else:
             image = resize_with_padding(image, IMAGE_SIZE)
+            
 
         return image, torch.tensor(label, dtype=torch.long)
 
 
-    
+class DocumentTestDataset(Dataset):
+    def __init__(self, data_dir, transform=None):
+        self.data_dir = data_dir
+        self.transform = transform
+        self.image_paths = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith((".jpg", ".png"))]
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        img_path = self.image_paths[idx]
+        image = Image.open(img_path).convert("RGB")
+
+        if self.transform:
+            image = self.transform(image)
+
+        file_name = os.path.basename(img_path)
+        return image, file_name
+
+
