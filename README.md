@@ -62,37 +62,40 @@
 - 정확도
 
 #### 프로젝트 구조
-aims_image_classifier/               # 프로젝트 루트 디렉터리
-│── data/                             # 데이터 관련 디렉터리
-│   ├── datasets/                     # 데이터셋 관련 코드
-│   │   ├── dataloader.py             # DataLoader 정의
-│   │   ├── dataset.py                # 커스텀 데이터셋 클래스 정의
-│   │   ├── preprocess.py             # 데이터 전처리 함수
-│   ├── fonts/                        # 폰트 파일 저장 폴더 (OCR 등에 사용될 수 있음)
-│── model_pth/                        # 학습된 모델 가중치 저장 디렉터리
-│── models/                           # 모델 아키텍처 정의
-│   ├── student_models.py             # Student 모델 정의 (MobileNet 등)
-│   ├── teacher_eff.py                # Teacher 모델 정의 (EfficientNet 등)
-│── utils/                            # 유틸리티 함수 및 도구 모음
-│   ├── eda/                          # 데이터 탐색 (EDA) 관련 코드
-│   ├── config.py                     # 설정값 및 하이퍼파라미터 관리
-│   ├── convert_onnx.py               # 모델을 ONNX 형식으로 변환하는 코드
-│   ├── early_stopping.py             # Early Stopping 구현
-│   ├── gpu_utils.py                  # GPU 관련 유틸리티 함수
-│   ├── kfold_merger.py               # K-Fold 모델 병합 코드
-│   ├── pdf_converter.py              # PDF를 이미지로 변환하는 코드
-│   ├── rename_files.py               # 파일명 정리하는 유틸리티
-│   ├── score.py                      # 모델 평가 점수 계산 코드
-│   ├── seeds.py                      # 랜덤 시드 고정 코드
-│── validation_visualization/         # 검증 과정에서 시각화된 이미지 저장 디렉터리
-│── .gitignore                        # Git에서 제외할 파일 정의
-│── inference_ensemble.py             # 앙상블 추론 코드
-│── inference.py                      # 단일 모델 추론 코드
-│── loss.py                           # 손실 함수 정의
-│── main.py                           # 메인 실행 스크립트 (학습 및 평가)
-│── README.md                         # 프로젝트 개요 및 사용법 설명
-│── requirements.txt                   # 필요한 Python 패키지 목록
-│── train.py                          # 모델 학습 코드
+```
+    aims_image_classifier/               # 프로젝트 루트 디렉터리
+    │── data/                             # 데이터 관련 디렉터리
+    │   ├── datasets/                     # 데이터셋 관련 코드
+    │   │   ├── dataloader.py             # DataLoader 정의
+    │   │   ├── dataset.py                # 커스텀 데이터셋 클래스 정의
+    │   │   ├── preprocess.py             # 데이터 전처리 함수
+    │   ├── fonts/                        # 폰트 파일 저장 폴더 (OCR 등에 사용될 수 있음)
+    │── model_pth/                        # 학습된 모델 가중치 저장 디렉터리
+    │── models/                           # 모델 아키텍처 정의
+    │   ├── student_models.py             # Student 모델 정의 (MobileNet 등)
+    │   ├── teacher_eff.py                # Teacher 모델 정의 (EfficientNet 등)
+    │── utils/                            # 유틸리티 함수 및 도구 모음
+    │   ├── eda/                          # 데이터 탐색 (EDA) 관련 코드
+    │   ├── config.py                     # 설정값 및 하이퍼파라미터 관리
+    │   ├── convert_onnx.py               # 모델을 ONNX 형식으로 변환하는 코드
+    │   ├── early_stopping.py             # Early Stopping 구현
+    │   ├── gpu_utils.py                  # GPU 관련 유틸리티 함수
+    │   ├── kfold_merger.py               # K-Fold 모델 병합 코드
+    │   ├── pdf_converter.py              # PDF를 이미지로 변환하는 코드
+    │   ├── rename_files.py               # 파일명 정리하는 유틸리티
+    │   ├── score.py                      # 모델 평가 점수 계산 코드
+    │   ├── seeds.py                      # 랜덤 시드 고정 코드
+    │── validation_visualization/         # 검증 과정에서 시각화된 이미지 저장 디렉터리
+    │── web_service/                      # 웹 서비스 관련 코드 (Django 기반)
+    │── .gitignore                        # Git에서 제외할 파일 정의
+    │── inference_ensemble.py             # 앙상블 추론 코드
+    │── inference.py                      # 단일 모델 추론 코드
+    │── loss.py                           # 손실 함수 정의
+    │── main.py                           # 메인 실행 스크립트 (학습 및 평가)
+    │── README.md                         # 프로젝트 개요 및 사용법 설명
+    │── requirements.txt                   # 필요한 Python 패키지 목록
+    │── train.py                          # 모델 학습 코드
+```
 
 #### 실행 방법
 ##### 가상환경 설정 (선택 사항)
@@ -123,6 +126,12 @@ aims_image_classifier/               # 프로젝트 루트 디렉터리
 
 ### 학습 결과
 - k-fold를 적용하였을 때, Teacher 모델은 100%, Student 모델은 약 80% 정확도를 보였다.
+![스크린샷 2025-02-03 132759](https://github.com/user-attachments/assets/7c69acac-8ba2-41ca-bb73-351600be5035)
 - Validation없이 Train 전체로 학습(temperature:0.3, alpha:0.7)하였을 때 Student 모델이 100%의 정확도를 보였다.
+    - Teacher
+    - ![스크린샷 2025-02-10 041336](https://github.com/user-attachments/assets/56bcbb4d-9d3d-4615-92d7-a903530bf5f6)
+    - Student
+    - ![스크린샷 2025-02-10 041427](https://github.com/user-attachments/assets/caace1c9-5403-409a-908d-dcd1a4f2b928)
+
 
 
