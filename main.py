@@ -2,13 +2,12 @@ import os
 import torch.nn as nn
 from torchvision import models
 
-from utils.gpu_utils import get_device, move_to_device
 from utils.config import DATA_DIR, BATCH_SIZE, RANDOM_SEED, NUM_CLASSES, LEARNING_RATE, TEMPERATURE, ALPHA, EPOCHES, K_FOLDS, PATIENCE, NUM_WORKERS
 from utils.seeds import set_seed
 
 #from datasets.dataloader import get_data_loaders
 from datasets.dataloader import get_data_loaders_with_kfold, get_train_data_loaders
-from models.teacher_eff import FeatureExtractorWrapper
+
 from models.student_models import CustomMobileNet
 from train import train_teacher, train_student, train_student_with_fd, train_student_with_va, train_teacher_all, train_student_all
 
