@@ -124,14 +124,24 @@
     python inference.py
 ```
 
-### 학습 결과
-- k-fold를 적용하였을 때, Teacher 모델은 100%, Student 모델은 약 80% 정확도를 보였다.
+## 학습 결과
+### K-Fold=5 적용
+- K-Fold를 적용하였을 때, Teacher 모델은 100%, Student 모델은 약 80% 정확도를 보였다.
 ![스크린샷 2025-02-03 132759](https://github.com/user-attachments/assets/7c69acac-8ba2-41ca-bb73-351600be5035)
+- 손실값이 널뛰어 Early Stop의 patience를 10으로 설정해야 했다.
+- Student의 경우, Loss가 떨어지지 않고 학습이 덜 된 상태에서 학습이 종료되었다.
+- 성능이 낮은 데다, 실시간 추론에 5개 Fold를 다 돌려야하는 불편함이 있어서 사용하지 않았다.
+
+### 전체 Train
 - Validation없이 Train 전체로 학습(temperature:0.3, alpha:0.7)하였을 때 Student 모델이 100%의 정확도를 보였다.
     - Teacher
-    - ![스크린샷 2025-02-10 041336](https://github.com/user-attachments/assets/56bcbb4d-9d3d-4615-92d7-a903530bf5f6)
+      ![스크린샷 2025-02-10 041336](https://github.com/user-attachments/assets/56bcbb4d-9d3d-4615-92d7-a903530bf5f6)
     - Student
-    - ![스크린샷 2025-02-10 041427](https://github.com/user-attachments/assets/caace1c9-5403-409a-908d-dcd1a4f2b928)
+      ![스크린샷 2025-02-10 041427](https://github.com/user-attachments/assets/caace1c9-5403-409a-908d-dcd1a4f2b928)
 
-
+### 기타
+- 학습 데이터가 극단적으로 없었음에도, 패턴이 정해져 특징이 매우 뚜렷한 레이아웃을 가졌기 때문에 약간의 기대를 갖고 시작하였다.
+- 학습도 얼마 걸리지 않았는데, 성능이 말도 안되게 좋았고 Student도 완벽한 성능을 보였다.
+- 생활기록부대체양식의 경우 test data에 포함된 양식이 아니라, 다른 학교의 생활기록부대체양식만 학습에 포함시켰을 때도 정확도가 100%, Confidence가 1.00이었다.
+  - 단, 변인이 아니었던 기초생활수급자증명서를 alpha가 0.7일 때 전혀 맞추지 못했고, alpha가 0.8일 때 전부 맞췄다.
 
