@@ -29,7 +29,7 @@ def collate_fn_test(batch):
     """
     images, file_names = zip(*batch)
 
-    # ✅ 가장 큰 높이, 너비를 찾아서 패딩 적용
+    # 가장 큰 높이, 너비를 찾아서 패딩 적용
     max_height = max([img.shape[1] for img in images])
     max_width = max([img.shape[2] for img in images])
 
@@ -40,7 +40,7 @@ def collate_fn_test(batch):
         padded_img = torch.nn.functional.pad(img, (0, pad_w, 0, pad_h), value=0)  # 오른쪽, 아래쪽에 패딩 추가
         padded_images.append(padded_img)
 
-    images = torch.stack(padded_images, dim=0)  # ✅ 동일한 크기로 정렬 후 스택
+    images = torch.stack(padded_images, dim=0)  # 동일한 크기로 정렬 후 스택
 
     return images, list(file_names)
 

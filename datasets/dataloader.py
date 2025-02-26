@@ -9,7 +9,7 @@ from datasets.preprocess import collate_fn, collate_fn_test
 from utils.config import IMAGE_SIZE
 
 
-def get_data_loaders(data_dir, batch_size, num_workers=4):
+def get_test_data_loaders(data_dir, batch_size, num_workers=4):
     transform = transforms.Compose([
         transforms.Resize(IMAGE_SIZE),
         transforms.ToTensor(),
@@ -80,8 +80,6 @@ def get_train_data_loaders(data_dir, batch_size, num_workers=4):
     # Transform 설정
     transform = transforms.Compose([
         transforms.RandomResizedCrop(IMAGE_SIZE, scale=(0.8, 1.0)),
-        transforms.RandomRotation(10),
-        transforms.RandomVerticalFlip(p=0.2),
         transforms.RandomApply([
         transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05)
         ], p=0.3),

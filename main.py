@@ -38,11 +38,10 @@ def main():
     # ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     train_loader = get_train_data_loaders(data_dir, batch_size=batch_size, num_workers=num_workers)
 
-    # 4-1. Teacher 모델 학습
-    # teacher = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.IMAGENET1K_V1)
-    # train_teacher_all(teacher, train_loader, epochs, lr, num_classes)
+    # 4. Teacher 모델 학습
+    teacher = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.IMAGENET1K_V1)
+    train_teacher_all(teacher, train_loader, epochs, lr, num_classes, patience)
 
-    # 4-2. Teach 학습 없이 Student 학습용
     teacher_model_path = os.path.join(model_dir, f"teacher_model.pth")
     
     teacher = models.efficientnet_b0(weights=None)
@@ -52,6 +51,7 @@ def main():
 
     # 5. Student 모델 학습 (지식 증류)
     student = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.IMAGENET1K_V1)
+    #student = models.shufflenet_v2_x1_0(weights=models.ShuffleNet_V2_X1_0_Weights.IMAGENET1K_V1)
     train_student_all(teacher, student, train_loader, epochs, lr, temperature, alpha, num_classes, patience)
     
     # ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
